@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../api.dart';
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({Key? key}) : super(key: key);
@@ -24,15 +25,31 @@ class _ChangePasswordState extends State<ChangePassword> {
   bool _isLoading = false; // لتفعيل مؤشر التحميل عند الضغط على الزر
 
   // سناك بار انه اتغبرت كلمه السر
-  void _handleChangePassword() {
+  Future<void> _handleChangePassword() async {
+    final current = _currentPasswordController.text;
+    final next = _newPasswordController.text;
+    if (next != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match")),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
-
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() => _isLoading = false);
+    try {
+      await Api.changePassword(current, next);
+      if (!mounted) return;
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Password is successfully changed")),
       );
-    });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

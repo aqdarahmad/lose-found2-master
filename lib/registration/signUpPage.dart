@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../api.dart';
 
 class AppColors {
   static const Color darkRed = Color(0xFF3D0A05);
@@ -56,20 +55,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final pass = _passwordCtrl.text;
 
     try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: pass,
-      );
-      final uid = cred.user!.uid;
-
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'email': email,
-        'username': username,
-        'bio': '',
-        'avatarURL':
-        'https://media.istockphoto.com/id/1337144146/vector/default-avatar-profile-icon-vector.jpg?s=612x612&w=0&k=20&c=BIbFwuv7FxTWvh5S3vB6bkT0Qv8Vn8N5Ffseq84ClGI=',
-        'createdAt': Timestamp.now(),
-      });
+      await Api.signUp(email, username, pass);
 
       if (!mounted) return;
 
@@ -77,21 +63,12 @@ class _SignUpPageState extends State<SignUpPage> {
         const SnackBar(content: Text('Registration Successfully')),
       );
 
-      // await Future.delayed(const Duration(milliseconds: 500));
-      Navigator.pushNamed(context, '/signIn');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sign-up failed: ${e.message}'),
-          backgroundColor: AppColors.rubyRed,
-        ),
-      );
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error writing Firestore: $e'),
+          content: Text('Sign-up failed: $e'),
           backgroundColor: AppColors.rubyRed,
         ),
       );

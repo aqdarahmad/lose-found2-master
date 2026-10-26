@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../api.dart';
 
 
 
@@ -38,22 +37,21 @@ class _LoginPageState extends State<LoginPage> {
   void _signIn() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    setState(() => _loading = true);
     try {
-      // 1) Sign in with Firebase Auth (اذا كان المستخدم مسجل من قبل بفوت)
-      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-      );
-
+      await Api.login(_emailCtrl.text.trim(), _passwordCtrl.text);
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
-    }
-    on FirebaseAuthException catch (e) {
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sign-in failed: ${e.message}'),
+          content: Text('Sign-in failed: $e'),
           backgroundColor: AppColors.rubyRed,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

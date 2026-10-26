@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import '../api.dart';
 import 'change_pswd.dart';
 import 'contact-support.dart';
 
@@ -20,8 +21,9 @@ class _settingsState extends State<settings> {
 
  //ليه async
   void _handleLogout() async {
-    // sign-out logic here
-    Navigator.pushReplacementNamed(context, '/signIn');
+    await Api.signOut();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/signIn', (route) => false);
   }
 
   @override

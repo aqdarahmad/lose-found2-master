@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../api.dart';
 
 class AppColors {
   static const Color darkRed = Color(0xFF3D0A05);
@@ -60,11 +60,15 @@ class _EditPostScreenState extends State<EditPostScreen> {
     );
 
     if (confirm == true) {
-      await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(widget.docId)
-          .delete();
-      Navigator.pop(context, {'deleted': true});
+      try {
+        await Api.deletePost(widget.docId);
+        Api.notifyPostsChanged();
+        if (!mounted) return;
+        Navigator.pop(context, {'deleted': true});
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
 
@@ -76,15 +80,20 @@ class _EditPostScreenState extends State<EditPostScreen> {
   }
 
   Future<void> _save() async {
-    await FirebaseFirestore.instance
-        .collection('posts')
-        .doc(widget.docId)
-        .update({
-      'description': _descCtrl.text.trim(),
-      'imageURL': _imgCtrl.text.trim(),
-      'isResolved': _found,
-    });
-    Navigator.pop(context);
+    try {
+      await Api.updatePost(
+        widget.docId,
+        _descCtrl.text.trim(),
+        _imgCtrl.text.trim(),
+        _found,
+      );
+      Api.notifyPostsChanged();
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override

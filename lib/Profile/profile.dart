@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../api.dart';
+import '../widgets.dart';
 import 'user_posts_widget.dart';
 
 class AppColors {
@@ -30,23 +30,23 @@ class _ProfileScreenState extends State<Profile> {
   }
 
   Future<void> _loadProfile() async {
-    final user = FirebaseAuth.instance.currentUser!;
-    final doc  = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    final data = doc.data()!;
-
-    setState(() {
-      uid       = user.uid;
-      email     = user.email;
-      username  = data['username']   as String;
-      avatarUrl = data['avatarURL']  as String;
-      bio       = data['bio']        as String?;
-      joined    = (data['createdAt'] as Timestamp).toDate();
-      isLoading = false;
-    });
-
+    try {
+      final data = await Api.getMe();
+      if (!mounted) return;
+      setState(() {
+        uid       = data['id'].toString();
+        email     = data['email'] as String?;
+        username  = data['username'] as String;
+        avatarUrl = data['avatarURL'] as String;
+        bio       = data['bio'] as String?;
+        joined    = DateTime.tryParse(data['createdAt']?.toString() ?? '');
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
@@ -55,6 +55,9 @@ class _ProfileScreenState extends State<Profile> {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+    if (username == null) {
+      return const Center(child: Text('Could not load your profile.'));
     }
 
     return Scaffold(
@@ -67,10 +70,7 @@ class _ProfileScreenState extends State<Profile> {
             color: AppColors.silk,
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundImage: NetworkImage(avatarUrl!),
-                ),
+                AvatarImage(url: avatarUrl ?? '', radius: 40),
                 const SizedBox(width: 16),
 
 
@@ -92,7 +92,7 @@ class _ProfileScreenState extends State<Profile> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Joined: ${formatShortDate(joined!.toLocal())}',
+                      'Joined: ${joined == null ? '' : formatShortDate(joined!.toLocal())}',
                       style: const TextStyle(color: AppColors.indianRed),
                     ),
                   ],

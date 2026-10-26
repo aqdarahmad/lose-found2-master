@@ -1,5 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../api.dart';
 import 'package:flutter/material.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -24,41 +23,34 @@ class EditProfileScreenState extends State<EditProfileScreen> {
   static const Color rubyRed = Color(0xFF7F1F0E);
 
   Future<void> _loadUserData() async {
-    final user = FirebaseAuth.instance.currentUser!;
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    final data = doc.data()!;
-
-    _nameCtrl.text = data['username'] as String;
-    _bioCtrl.text = data['bio'] as String? ?? '';
-    _imgCtrl.text = data['avatarURL'] as String;
-
-    setState(() => _loading = false);
+    try {
+      final data = await Api.getMe();
+      _nameCtrl.text = data['username'] as String;
+      _bioCtrl.text = data['bio'] as String? ?? '';
+      _imgCtrl.text = data['avatarURL'] as String;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _save() async {
     setState(() => _loading = true);
-    final user = FirebaseAuth.instance.currentUser!;
-    final newName = _nameCtrl.text.trim();
-    final newBio = _bioCtrl.text.trim();
-    final newUrl = _imgCtrl.text.trim();
-
-    // update user doc
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .update({
-      'username': newName,
-      'bio': newBio,
-      'avatarURL': newUrl,
-    });
-
-
-    Navigator.pop(context);
-    setState(() {});
-
+    try {
+      await Api.updateMe(
+        _nameCtrl.text.trim(),
+        _bioCtrl.text.trim(),
+        _imgCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override

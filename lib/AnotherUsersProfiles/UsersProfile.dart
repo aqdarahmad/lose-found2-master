@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../api.dart';
+import '../widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:lose_found/AnotherUsersProfiles/UserPosts.dart';
 
@@ -30,24 +31,20 @@ class _UsersProfileState extends State<UsersProfile> {
   }
 
   Future<void> _loadUserProfile() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.uid)
-        .get();
-
-    if (!doc.exists) {
+    try {
+      final data = await Api.getUser(widget.uid);
+      if (!mounted) return;
+      setState(() {
+        username   = data['username']   as String?;
+        bio        = data['bio']        as String?;
+        avatarUrl  = data['avatarURL']  as String?;
+        joined     = DateTime.tryParse(data['createdAt']?.toString() ?? '');
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      return;
     }
-
-    final data = doc.data()!;
-    setState(() {
-      username   = data['username']   as String?;
-      bio        = data['bio']        as String?;
-      avatarUrl  = data['avatarURL']  as String?;
-      joined     = (data['createdAt'] as Timestamp).toDate();
-      _isLoading = false;
-    });
   }
 
   @override
@@ -69,12 +66,7 @@ class _UsersProfileState extends State<UsersProfile> {
               color: AppColors.silk,
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundImage: avatarUrl != null
-                        ? NetworkImage(avatarUrl!)
-                        : null,
-                  ),
+                  AvatarImage(url: avatarUrl ?? '', radius: 40),
                   const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

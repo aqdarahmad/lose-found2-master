@@ -1,13 +1,12 @@
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'api.dart';
 
 import 'Posts/posts.dart';
 import 'Search.dart';
 import 'Profile/profile.dart';
 import 'Setting/settings.dart';
-import 'messages.dart';
+import 'Messages.dart';
 
 class AppColors {
   static const Color darkRed = Color(0xFF3D0A05);
@@ -41,17 +40,23 @@ class _HomeState extends State<Home> {
   }
 
   void _loadUserProfile() async {
-    final user = FirebaseAuth.instance.currentUser!;
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    final data = doc.data()!;
-    setState(() {
-      _uid       = user.uid;
-      _avatarUrl = data['avatarURL'] as String?;
-      _isLoading = false;
-    });
+    try {
+      final me = await Api.getMe();
+      if (!mounted) return;
+      setState(() {
+        _uid = me['id'].toString();
+        _avatarUrl = me['avatarURL'] as String?;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (e is ApiException && e.status == 401) {
+        await Api.signOut();
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/signIn');
+      }
+    }
   }
 
   void _showAddPostDialog() {
@@ -122,20 +127,20 @@ class _HomeState extends State<Home> {
             ),
             onPressed: () async {
               if (!(_formKey.currentState?.validate() ?? false)) return;
-              await FirebaseFirestore.instance.collection('posts').add({
-                // now store reference to the user document
-                'authorRef': FirebaseFirestore.instance.doc('users/$_uid'),
-                'description': _descCtrl.text.trim(),
-                'imageURL': _imageUrlCtrl.text.trim(),
-                'isResolved': false,
-                // وظيفه الTimestamp
-                'createdAt': Timestamp.now(),
-              });
+              try {
+                await Api.createPost(_descCtrl.text.trim(), _imageUrlCtrl.text.trim());
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString())),
+                );
+                return;
+              }
 
               _descCtrl.clear();
               _imageUrlCtrl.clear();
               Navigator.pop(context);
-              setState(() {}); // refresh list
+              Api.notifyPostsChanged(); // refresh list
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Post published!')),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lose_found/api.dart';
+import 'package:lose_found/widgets.dart';
 import 'package:lose_found/AnotherUsersProfiles/UsersProfile.dart';
 
 class Search extends StatelessWidget {
@@ -41,26 +42,23 @@ class _SearchListState extends State<_SearchList> {
   //future يعني عمليه بدها وقت لحتى يكون في اتصال بالانترنت وتتصل بالداتابيس وفي كمله await
   //
   Future<void> _loadUsers() async {
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .get();
-
-      _allUsers = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'uid': doc.id,
-          'username': data['username'] ,
-          'avatarURL': data['avatarURL'] ,
-        };
-      }).toList();
-
-      setState(() {
-        _filteredUsers = List.from(_allUsers);
-        _isLoading = false;
-      });
-
-
+    try {
+      final users = await Api.users();
+      _allUsers = users
+          .map((u) => {
+                'uid': u['id'].toString(),
+                'username': (u['username'] ?? '').toString(),
+                'avatarURL': (u['avatarURL'] ?? '').toString(),
+              })
+          .toList();
+    } catch (_) {
+      _allUsers = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _filteredUsers = List.from(_allUsers);
+      _isLoading = false;
+    });
   }
   /*
    contains: وظيفتها انها تفحص اذا النص الاول يحتوي على النص الثاني
@@ -103,9 +101,9 @@ class _SearchListState extends State<_SearchList> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundImage:
-                  NetworkImage(user['avatarURL'] as String),
+                leading: AvatarImage(
+                  url: user['avatarURL'] as String,
+                  radius: 20,
                 ),
                 title: Text(user['username'] as String),
                 onTap: () {

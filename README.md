@@ -1,14 +1,15 @@
 # Lost & Found
 
-A Flutter mobile app that helps people recover lost items. Users publish posts about things they lost or found, interact with each other's posts, and manage their own profile. Backend: Firebase Authentication and Cloud Firestore.
+A Flutter mobile app that helps people recover lost items. Users publish posts about things they lost or found, interact with each other's posts, and manage their own profile. Backend: a small Node.js/Express API with PostgreSQL (Neon), JWT sign-in, deployed on Render together with the Flutter web build.
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.7-0175C2?logo=dart&logoColor=white)
-![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)
+![Node](https://img.shields.io/badge/Node.js-Express-339933?logo=nodedotjs&logoColor=white)
+![Postgres](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
 
 ## Features
 
-- **Accounts:** sign up and sign in with email and password (Firebase Authentication)
+- **Accounts:** sign up and sign in with email and password (bcrypt-hashed, JWT session)
 - **Posts:** create a post with a title, description and image link; edit or delete your own posts
 - **Interaction:** like posts, comment on them and save posts for later
 - **Search:** find posts quickly
@@ -20,51 +21,63 @@ A Flutter mobile app that helps people recover lost items. Users publish posts a
 
 | Area | Tools |
 |---|---|
-| App | Flutter, Dart, Material |
-| Auth | `firebase_auth` |
-| Database | `cloud_firestore` (collections: `users`, `posts`, `comments`, `likes`, `savedPosts`) |
+| App | Flutter (web + mobile), Dart, Material |
+| API | Node.js, Express 5, `pg`, `bcryptjs`, `jsonwebtoken`, `helmet`, `express-rate-limit` |
+| Database | PostgreSQL on [Neon](https://neon.tech) (tables `lf_users`, `lf_posts`, `lf_likes`, `lf_comments`, `lf_saved_posts`, created automatically) |
+| Hosting | Render (one web service serves the API and the Flutter web build) |
 
 ## Project structure
 
 ```
 lib/
   main.dart              app entry and routes
+  api.dart               REST client (session, posts, likes, comments, users)
+  widgets.dart           shared image/avatar widgets and time formatting
   home.dart              feed and "Add new post"
-  Search.dart            search
+  Search.dart            search users
   Messages.dart          messages screen (UI prototype with sample data)
   registration/          sign in, sign up
-  Posts/                 posts, comments sheet, saved posts, post actions
+  Posts/                 post card + feed, comments sheet, saved posts, post actions
   Profile/               my profile, edit profile, edit post, my posts
   AnotherUsersProfiles/  other users' profiles and posts
   Setting/               settings, change password, help, report, support
-  firebase_options.dart  Firebase configuration
+server/
+  index.js               Express app (API + serves build/web)
+  routes.js              REST endpoints with validation and ownership checks
+  db.js                  Neon/Postgres pool and schema
+render-build.sh          installs Flutter, builds the web app, installs the server
+render.yaml              Render blueprint
 ```
+
+## Deploy on Render
+
+1. Create a free Postgres database on [Neon](https://neon.tech) and copy its connection string.
+2. Render → **New → Web Service** → connect this repo (branch `master`).
+3. Runtime **Node**, Build Command `bash render-build.sh`, Start Command `node server/index.js`.
+4. Environment variables: `DATABASE_URL` (the Neon string). `JWT_SECRET` is optional (derived from `DATABASE_URL` if omitted).
+5. Open `/api/health` after the deploy; it should show `"db": true`.
+
+The first build installs Flutter and takes several minutes.
 
 ## Run locally
 
-1. Install [Flutter](https://docs.flutter.dev/get-started/install) and run `flutter doctor`.
-2. Clone and install packages:
-   ```bash
-   git clone https://github.com/aqdarahmad/lose-found2-master.git
-   cd lose-found2-master
-   flutter pub get
-   ```
-3. Use your own Firebase project (recommended): create a project, enable **Email/Password** sign-in and **Cloud Firestore**, then run
-   ```bash
-   dart pub global activate flutterfire_cli
-   flutterfire configure
-   ```
-   which regenerates `lib/firebase_options.dart`.
-4. Start the app:
-   ```bash
-   flutter run
-   ```
+```bash
+git clone https://github.com/aqdarahmad/lose-found2-master.git
+cd lose-found2-master
+flutter pub get
+flutter build web --release
+cd server && npm install
+DATABASE_URL=postgresql://... node index.js     # http://localhost:5000
+```
+
+For a mobile build point the app to your server:
+`flutter run --dart-define=API_BASE_URL=https://<your-service>.onrender.com`
 
 ## Status and next steps
 
 - The **Messages** screen is a UI prototype with sample data; real-time chat is not implemented yet.
 - Posts use an image **link**; uploading photos from the device (Firebase Storage) is a planned improvement.
-- Firestore security rules should be tightened before any public release.
+- Posts and feeds refresh on pull-to-refresh and after your own actions (no live push updates).
 
 ## Author
 

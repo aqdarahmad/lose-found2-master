@@ -1,70 +1,53 @@
-
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../api.dart';
 import 'comments_sheet.dart';
 
 class PostActions extends StatefulWidget {
-  final String postId;
-  final bool isResolved;
+  final Map<String, dynamic> post;
 
-  const PostActions({
-    Key? key,
-    required this.postId,
-    required this.isResolved,
-  }) : super(key: key);
+  const PostActions({Key? key, required this.post}) : super(key: key);
 
   @override
   State<PostActions> createState() => _PostActionsState();
 }
 
 class _PostActionsState extends State<PostActions> {
-  int likeCount = 0;
-  bool isLiked = false;
-  final _db = FirebaseFirestore.instance;
-  final _user = FirebaseAuth.instance.currentUser!;
+  late int likeCount;
+  late bool isLiked;
+  late bool isResolved;
+
+  String get _postId => widget.post['id'].toString();
 
   @override
   void initState() {
     super.initState();
-    _loadPost();
+    likeCount = (widget.post['likeCount'] as int?) ?? 0;
+    isLiked = (widget.post['liked'] as bool?) ?? false;
+    isResolved = (widget.post['isResolved'] as bool?) ?? false;
   }
 
-
-  void _loadPost() async {
-    final snap = await _db
-        .collection('posts')
-        .doc(widget.postId)
-        .collection('likes')
-        .get();
+  Future<void> _toggleLike() async {
+    final wasLiked = isLiked;
+    final oldCount = likeCount;
+    // optimistic update
     setState(() {
-      likeCount = snap.docs.length;
-      //is liked تاكد هل المستخدم الحالي عامل لايك على هاد البوست او لأ
-      isLiked = snap.docs.any((d) => d.id == _user.uid);
+      isLiked = !wasLiked;
+      likeCount = wasLiked ? oldCount - 1 : oldCount + 1;
     });
-  }
-//هاد بفحص ازا المستخدم عمل لايك على اشي ازا عمل بظهر انه عمل عند عدد الكاونت ازا ما عمل ما بظهر
-  void _toggleLike() async {
-    final likeRef = _db
-        .collection('posts')
-        .doc(widget.postId)
-        .collection('likes')
-        .doc(_user.uid);
-
-    if (isLiked) {
-      await likeRef.delete();
+    try {
+      final p = await Api.setLike(_postId, !wasLiked);
+      if (!mounted) return;
       setState(() {
-        likeCount--;
-        isLiked = false;
+        likeCount = (p['likeCount'] as int?) ?? likeCount;
+        isLiked = (p['liked'] as bool?) ?? isLiked;
       });
-    } else {
-      //Timestamp هو نوع بيانات خاص بـ Firebase Firestore، يُستخدم لتخزين التواريخ والأوقات بدقة
-      //,nowانه بتنشا وقت زمني حالي مثلا بظهر للمستخدم لايك قبل 3 دقايق
-      await likeRef.set({'timestamp': Timestamp.now()});
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        likeCount++;
-        isLiked = true;
+        isLiked = wasLiked;
+        likeCount = oldCount;
       });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -73,17 +56,15 @@ class _PostActionsState extends State<PostActions> {
     return Row(
       children: [
         Icon(
-          widget.isResolved ? Icons.check_circle : Icons.error_outline,
-          color: widget.isResolved ? Colors.green : Colors.red,
+          isResolved ? Icons.check_circle : Icons.error_outline,
+          color: isResolved ? Colors.green : Colors.red,
         ),
         const SizedBox(width: 8),
         Text(
-          widget.isResolved ? 'Founded' : 'Lose',
+          isResolved ? 'Founded' : 'Lose',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-
         const Spacer(),
-
         IconButton(
           icon: Icon(
             isLiked ? Icons.favorite : Icons.favorite_border,
@@ -92,14 +73,15 @@ class _PostActionsState extends State<PostActions> {
           onPressed: _toggleLike,
         ),
         Text('$likeCount'),
-
         const SizedBox(width: 16),
-
         IconButton(
           icon: const Icon(Icons.mode_comment_outlined),
-          onPressed: () => showCommentsSheet(context, widget.postId),
+          onPressed: () => showCommentsSheet(context, _postId),
         ),
-        SavePostButton(postId: widget.postId),
+        SavePostButton(
+          postId: _postId,
+          initialSaved: (widget.post['saved'] as bool?) ?? false,
+        ),
       ],
     );
   }
@@ -107,57 +89,29 @@ class _PostActionsState extends State<PostActions> {
 
 class SavePostButton extends StatefulWidget {
   final String postId;
+  final bool initialSaved;
 
-  const SavePostButton({Key? key, required this.postId}) : super(key: key);
+  const SavePostButton({Key? key, required this.postId, this.initialSaved = false})
+      : super(key: key);
 
   @override
-  _SavePostButtonState createState() => _SavePostButtonState();
+  State<SavePostButton> createState() => _SavePostButtonState();
 }
 
 class _SavePostButtonState extends State<SavePostButton> {
-  bool isSaved = false;
-  final user = FirebaseAuth.instance.currentUser!;
-  final _db = FirebaseFirestore.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkIfSaved();
-  }
-
-  Future<void> _checkIfSaved() async {
-    final doc = await _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('savedPosts')
-        .doc(widget.postId)
-        .get();
-    setState(() {
-      isSaved = doc.exists;
-    });
-  }
+  late bool isSaved = widget.initialSaved;
 
   Future<void> _toggleSave() async {
-    final savedRef = _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('savedPosts')
-        .doc(widget.postId);
-
-    if (isSaved) {
-      await savedRef.delete();
-    } else {
-      await savedRef.set({
-        'postRef': FirebaseFirestore.instance
-            .collection('posts')
-            .doc(widget.postId),
-        'savedAt': Timestamp.now(),
-      });
+    final was = isSaved;
+    setState(() => isSaved = !was);
+    try {
+      await Api.setSaved(widget.postId, !was);
+      Api.notifyPostsChanged(); // refresh the "Saved posts" list
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isSaved = was);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
-
-    setState(() {
-      isSaved = !isSaved;
-    });
   }
 
   @override
@@ -171,4 +125,3 @@ class _SavePostButtonState extends State<SavePostButton> {
     );
   }
 }
-
