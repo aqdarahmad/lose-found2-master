@@ -76,7 +76,7 @@ For a mobile build point the app to your server:
 ## Status and next steps
 
 - The **Messages** screen is a UI prototype with sample data; real-time chat is not implemented yet.
-- Posts use an image **link**; uploading photos from the device (Firebase Storage) is a planned improvement.
+- Posts use an image **link**; uploading photos from the device is a planned improvement.
 - Posts and feeds refresh on pull-to-refresh and after your own actions (no live push updates).
 
 ## Author
